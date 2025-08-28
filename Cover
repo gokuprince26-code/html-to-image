@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Starfall: The Mortal Who Touched Divinity</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Lora:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Lora', serif;
+        }
+        .font-cinzel {
+            font-family: 'Cinzel', serif;
+        }
+        .text-glow {
+            text-shadow: 0 0 8px rgba(255, 255, 255, 0.6), 0 0 10px rgba(255, 255, 255, 0.4);
+        }
+        /* Styles for the modal */
+        #blurbModal.hidden {
+            display: none;
+        }
+        .modal-content {
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        /* Loading spinner */
+        .loader {
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #3498db;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-900 flex items-center justify-center min-h-screen p-4">
+    <!-- Main container for the book cover -->
+    <div class="w-full max-w-[600px] h-auto aspect-[2/3] bg-cover bg-center shadow-2xl rounded-lg overflow-hidden relative" style="background-image: url('http://googleusercontent.com/file_content/0');">
+        <div class="absolute inset-0 bg-black bg-opacity-30"></div>
+        <div class="relative z-10 flex flex-col h-full p-6 sm:p-12 text-white">
+            <div class="flex-grow flex flex-col justify-center items-center text-center">
+                <!-- Main Title -->
+                <h1 class="font-cinzel text-5xl sm:text-7xl font-bold tracking-wider text-glow uppercase">
+                    Starfall
+                </h1>
+                <!-- Subtitle -->
+                <p class="mt-4 text-xl sm:text-2xl italic text-gray-200 text-glow">
+                    The Mortal Who Touched Divinity
+                </p>
+            </div>
+            <div class="text-center pb-4">
+                 <!-- Gemini API Feature Button -->
+                <button id="generateBlurbBtn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-full transition duration-300 ease-in-out transform hover:scale-105 shadow-lg">
+                    ✨ Generate Book Blurb
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for displaying the generated blurb -->
+    <div id="blurbModal" class="hidden fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl relative">
+            <button id="closeModalBtn" class="absolute top-4 right-4 text-gray-500 hover:text-gray-800 text-3xl">&times;</button>
+            <div class="p-8 modal-content">
+                <div id="loader" class="loader mx-auto my-8"></div>
+                <div id="blurbResult" class="hidden">
+                    <h2 class="font-cinzel text-3xl font-bold text-gray-800 mb-4">The Story Begins...</h2>
+                    <p id="blurbText" class="text-gray-700 leading-relaxed"></p>
+                    <!-- Gemini TTS Feature Button -->
+                    <div class="mt-6 text-center">
+                        <button id="readAloudBtn" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-5 rounded-full transition duration-300 ease-in-out transform hover:scale-105 shadow-md">
+                            🔊 Read Aloud
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // DOM elements
+        const generateBlurbBtn = document.getElementById('generateBlurbBtn');
+        const blurbModal = document.getElementById('blurbModal');
+        const closeModalBtn = document.getElementById('closeModalBtn');
+        const loader = document.getElementById('loader');
+        const blurbResult = document.getElementById('blurbResult');
+        const blurbText = document.getElementById('blurbText');
+        const readAloudBtn = document.getElementById('readAloudBtn');
+
+        // --- Event Listeners ---
+        generateBlurbBtn.addEventListener('click', handleGenerateBlurb);
+        readAloudBtn.addEventListener('click', handleReadAloud);
+        closeModalBtn.addEventListener('click', closeModal);
+        blurbModal.addEventListener('click', (event) => {
+            if (event.target === blurbModal) {
+                closeModal();
+            }
+        });
+
+        // --- Functions ---
+        function openModal() {
+            blurbModal.classList.remove('hidden');
+            loader.style.display = 'block';
+            blurbResult.classList.add('hidden');
+        }
+
+        function closeModal() {
+            blurbModal.classList.add('hidden');
+        }
+
+        /**
+         * Handles the click event for generating a book blurb.
+         * Makes an API call to Gemini for text generation.
+         */
+        async function handleGenerateBlurb() {
+            openModal();
+            const apiKey = ""; // This will be handled by the environment
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+            const systemPrompt = `You are a bestselling fantasy author. Your task is to write a compelling, mysterious, and epic book blurb. The blurb should be between 150 and 200 words.`;
+            const userQuery = `Write a book blurb for a novel titled "Starfall: The Mortal Who Touched Divinity". The cover shows a young man lying on a rooftop at night, gazing at a shooting star against a vast, starry sky above an old, ornate city. The tone should be one of wonder, destiny, and impending adventure.`;
+            const payload = {
+                contents: [{ parts: [{ text: userQuery }] }],
+                systemInstruction: { parts: [{ text: systemPrompt }] },
+            };
+
+            try {
+                const response = await callGeminiWithBackoff(apiUrl, payload);
+                const text = response.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (text) displayText(text);
+                else {
+                    displayText("Sorry, I couldn't come up with a blurb right now. Please try again.");
+                    console.error("Invalid response structure from API:", response);
+                }
+            } catch (error) {
+                console.error('Error calling Gemini API:', error);
+                displayText(`An error occurred. Please check the console for details. ${error.message}`);
+            }
+        }
+
+        /**
+         * Handles the click event for reading the blurb aloud.
+         * Makes an API call to Gemini for Text-to-Speech.
+         */
+        async function handleReadAloud() {
+            const textToRead = blurbText.innerText;
+            if (!textToRead) return;
+
+            readAloudBtn.disabled = true;
+            readAloudBtn.innerText = "Generating Audio...";
+
+            const apiKey = ""; // This will be handled by the environment
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`;
+            const payload = {
+                contents: [{
+                    parts: [{ text: `Say in a clear, narrative voice, suitable for a fantasy novel trailer: ${textToRead}` }]
+                }],
+                generationConfig: {
+                    responseModalities: ["AUDIO"],
+                    speechConfig: {
+                        voiceConfig: {
+                            prebuiltVoiceConfig: { voiceName: "Charon" } // A clear, informative voice
+                        }
+                    }
+                },
+                model: "gemini-2.5-flash-preview-tts"
+            };
+
+            try {
+                const response = await callGeminiWithBackoff(apiUrl, payload);
+                const part = response?.candidates?.[0]?.content?.parts?.[0];
+                const audioData = part?.inlineData?.data;
+                const mimeType = part?.inlineData?.mimeType;
+
+                if (audioData && mimeType && mimeType.startsWith("audio/")) {
+                    const sampleRateMatch = mimeType.match(/rate=(\d+)/);
+                    if (sampleRateMatch) {
+                        const sampleRate = parseInt(sampleRateMatch[1], 10);
+                        const pcmData = base64ToArrayBuffer(audioData);
+                        const pcm16 = new Int16Array(pcmData);
+                        const wavBlob = pcmToWav(pcm16, 1, sampleRate, 16);
+                        const audioUrl = URL.createObjectURL(wavBlob);
+                        new Audio(audioUrl).play();
+                    } else {
+                         throw new Error("Sample rate not found in mimeType");
+                    }
+                } else {
+                    throw new Error("Invalid or missing audio data in response.");
+                }
+            } catch (error) {
+                console.error('Error calling Gemini TTS API:', error);
+                alert("Sorry, couldn't generate the audio at this moment.");
+            } finally {
+                readAloudBtn.disabled = false;
+                readAloudBtn.innerText = "🔊 Read Aloud";
+            }
+        }
+
+        /**
+         * Displays the generated text in the modal.
+         * @param {string} text - The text to display.
+         */
+        function displayText(text) {
+            loader.style.display = 'none';
+            blurbText.innerText = text;
+            blurbResult.classList.remove('hidden');
+        }
+
+        /**
+         * Makes a fetch request to the Gemini API with exponential backoff for retries.
+         * @param {string} url - The API endpoint URL.
+         * @param {object} payload - The request payload.
+         * @param {number} maxRetries - The maximum number of retries.
+         * @returns {Promise<object>} - The JSON response from the API.
+         */
+        async function callGeminiWithBackoff(url, payload, maxRetries = 3) {
+            let attempt = 0;
+            let delay = 1000;
+            while (attempt < maxRetries) {
+                try {
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    if (response.ok) return await response.json();
+                    if (response.status === 429 || response.status >= 500) {
+                        console.warn(`Attempt ${attempt + 1} failed with status ${response.status}. Retrying in ${delay}ms...`);
+                    } else {
+                        throw new Error(`API request failed with status ${response.status}: ${response.statusText}`);
+                    }
+                } catch (error) {
+                    if (attempt + 1 >= maxRetries) throw error;
+                    console.warn(`Attempt ${attempt + 1} failed with error. Retrying in ${delay}ms...`);
+                }
+                await new Promise(resolve => setTimeout(resolve, delay));
+                attempt++;
+                delay *= 2;
+            }
+            throw new Error('Max retries reached. Could not connect to the Gemini API.');
+        }
+
+        /**
+         * Converts a base64 string to an ArrayBuffer.
+         * @param {string} base64 - The base64 encoded string.
+         * @returns {ArrayBuffer}
+         */
+        function base64ToArrayBuffer(base64) {
+            const binaryString = window.atob(base64);
+            const len = binaryString.length;
+            const bytes = new Uint8Array(len);
+            for (let i = 0; i < len; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+            }
+            return bytes.buffer;
+        }
+
+        /**
+         * Converts raw PCM audio data to a WAV file Blob.
+         * @param {Int16Array} pcmData - The raw PCM data.
+         * @param {number} numChannels - Number of audio channels.
+         * @param {number} sampleRate - The sample rate.
+         * @param {number} bitsPerSample - The bits per sample.
+         * @returns {Blob} - A Blob representing the WAV file.
+         */
+        function pcmToWav(pcmData, numChannels, sampleRate, bitsPerSample) {
+            const blockAlign = (numChannels * bitsPerSample) >> 3;
+            const byteRate = sampleRate * blockAlign;
+            const dataSize = pcmData.length * (bitsPerSample >> 3);
+            const buffer = new ArrayBuffer(44 + dataSize);
+            const view = new DataView(buffer);
+
+            // RIFF header
+            writeString(view, 0, 'RIFF');
+            view.setUint32(4, 36 + dataSize, true);
+            writeString(view, 8, 'WAVE');
+            // fmt chunk
+            writeString(view, 12, 'fmt ');
+            view.setUint32(16, 16, true); // Subchunk1Size
+            view.setUint16(20, 1, true); // AudioFormat (1=PCM)
+            view.setUint16(22, numChannels, true);
+            view.setUint32(24, sampleRate, true);
+            view.setUint32(28, byteRate, true);
+            view.setUint16(32, blockAlign, true);
+            view.setUint16(34, bitsPerSample, true);
+            // data chunk
+            writeString(view, 36, 'data');
+            view.setUint32(40, dataSize, true);
+
+            // Write PCM data
+            for (let i = 0; i < pcmData.length; i++) {
+                view.setInt16(44 + i * 2, pcmData[i], true);
+            }
+
+            return new Blob([view], { type: 'audio/wav' });
+        }
+
+        function writeString(view, offset, string) {
+            for (let i = 0; i < string.length; i++) {
+                view.setUint8(offset + i, string.charCodeAt(i));
+            }
+        }
+    </script>
+</body>
+</html>
